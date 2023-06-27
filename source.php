@@ -1,13 +1,20 @@
 <?php
 
-//  Version 2.0 2022-09-20
-//  An email template for sending an email to the site admin when an UM User Profile is updated
-//  Source: https://github.com/MissVeronica/UM-Admin-User-Profile-Update-Email
+//  Version 2.1 2023-06-27 Forked by KeanuTang
+//  An email template for sending an email to the site admin when an UM User Profile is updated.
+//  Forked version includes before/after changes in the email.
+//  Source: https://github.com/KeanuTang/UM-Admin-User-Profile-Update-Email.git
 
+add_action( 'um_user_before_updating_profile', 'custom_before_profile_is_updated', 10, 3);
 add_filter( 'um_email_notifications', 'custom_email_notifications_profile_is_updated', 10, 1 );
 add_action( 'um_user_after_updating_profile', 'custom_profile_is_updated_email', 10, 3 );
 add_action( 'profile_update', 'custom_profile_is_updated_email_backend', 10, 3 );
 add_filter( 'um_admin_settings_email_section_fields', 'um_admin_settings_email_section_fields_custom_forms', 10, 2 );
+
+// Save off the user profile prior to processing the update
+function custom_before_profile_is_updated($userinfo) {
+    UM()->user()->prior_data = $userinfo;
+}
 
 function custom_email_notifications_profile_is_updated( $emails ) {
 
@@ -53,6 +60,12 @@ function custom_profile_is_updated_email( $to_update, $user_id, $args = array() 
 
     global $current_user;
 
+    $old_data = UM()->user()->prior_data;  //User profile prior to processing updates
+    $user_fields = array();  //Field display names
+    foreach ( UM()->builtin()->all_user_fields() as $key => $arr ) {
+        $user_fields[ $key ] = isset( $arr['title'] ) ? $arr['title'] : '';
+    }
+
     $forms = UM()->options()->get( 'profile_is_updated_email_custom_forms' );
 
     if( !empty( $forms )) {
@@ -76,14 +89,30 @@ function custom_profile_is_updated_email( $to_update, $user_id, $args = array() 
 
     $time_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
     um_fetch_user( $user_id );
+
+    //Diff the old and new values
+    $fields_updated;
+    foreach( $to_update as $key => $value ) {
+        if ($value != $old_data[$key]) {
+            $before = strlen($old_data[$key])>0 ? $old_data[$key] : '&lt;blank&gt;';
+            $after = strlen($value)>0 ? $value : '&lt;blank&gt;';
+            $fields_updated .= '<tr><td style="padding: .5rem">' . $user_fields[$key] . ' ' . $after . '</td>';
+            $fields_updated .= '<td style="padding: .5rem">' . $user_fields[$key] . ' ' . $before . '</td></tr>';
+        }
+    }
+    if (strlen($fields_updated)>0){
+        $fields_updated = '<table><thead><td style="padding: .5rem"><strong>Updated Information</strong></td><td style="padding: .5rem"><strong>Old Information</strong></td></thead>' . $fields_updated . '</table>';
+    }
     
     $args['tags'] = array(  '{profile_url}',
                             '{current_date}',
-                            '{updating_user}' );
+                            '{updating_user}', 
+                            '{fields_updated}' );
 
     $args['tags_replace'] = array(  um_user_profile_url( $user_id ), 
                                     date_i18n( $time_format, current_time( 'timestamp' )), 
-                                    $current_user->user_login );
+                                    $current_user->user_login, 
+                                    $fields_updated);
 
     UM()->mail()->send( get_bloginfo( 'admin_email' ), 'profile_is_updated_email', $args );
 

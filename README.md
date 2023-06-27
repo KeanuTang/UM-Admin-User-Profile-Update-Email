@@ -6,6 +6,10 @@ Enter the UM Profile Form IDs comma separated when emails should be sent in: UM 
 
 Version 2: Supports multiple Profile forms with other fields than in the Registration form.
 
+Version 2.1: Forked from original version
+Includes support to show before/after changes made to the user profile in the email. Also changes the default
+template slightly.
+
 ## Installation
 Install by adding the file source.php to your child-theme’s functions.php file
 or use the “Code Snippets” Plugin
